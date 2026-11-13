@@ -491,3 +491,31 @@ textarea.code { width: 100%; box-sizing: border-box; font-family: ui-monospace, 
   .cx { grid-template-columns: 70px 1fr 60px; }
   .cx > .tiny { grid-column: 1 / -1; }
 }
+
+/* ---- チュートリアル ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.linkish { background: none; border: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline dotted; }
+.tour { position: fixed; inset: 0; z-index: 60; }
+.tour-dim { position: fixed; inset: 0; background: rgba(4, 9, 16, 0.7); }
+.tour-spot { position: fixed; border-radius: 10px; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(4, 9, 16, 0.7), 0 0 18px rgba(78, 161, 255, 0.5); transition: all 0.25s ease; pointer-events: none; }
+.tour-card { position: fixed; background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55); box-sizing: border-box; }
+.tour-dots { display: flex; gap: 4px; }
+.tour-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--surface-3); }
+.tour-dots i.past { background: var(--axis); }
+.tour-dots i.on { background: var(--accent); width: 16px; border-radius: 3px; }
+.guide { position: fixed; left: 16px; bottom: 16px; z-index: 30; width: 320px; max-height: min(60vh, 520px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; }
+.guide-pill { width: auto; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; color: var(--text); font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 999px; }
+.guide-phase { display: flex; justify-content: space-between; align-items: baseline; }
+.guide-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.guide-step { display: flex; gap: 8px; width: 100%; text-align: left; background: none; border: none; color: var(--text-2); font-size: 13px; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+.guide-step:hover { background: var(--surface-2); }
+.gmark { flex: 0 0 16px; text-align: center; color: var(--muted); }
+.guide-steps li.done .guide-step { color: var(--muted); }
+.guide-steps li.done .gmark { color: var(--good); }
+.guide-steps li.cur .guide-step { color: var(--text); font-weight: 700; background: var(--accent-soft); }
+.guide-steps li.cur .gmark { color: var(--accent); }
+.guide-more { margin: 2px 0 6px 30px; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+@media (max-width: 640px) {
+  .guide { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 50vh; }
+  .guide-pill { right: auto; }
+}

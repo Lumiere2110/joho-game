@@ -12,6 +12,7 @@ import type { GameState } from '../core/types';
 import { PHASE_NAMES } from '../core/types';
 import { CommandCenter } from './CommandCenter';
 import { GameCtx, Modal, man, useGame, type Mode, type Screen, type Selection } from './common';
+import { GUIDE_KEY, GuidePanel, TOUR_KEY, Tour, loadGuideView, type GuideView } from './Tutorial';
 import { AdminScreen, BusinessScreen, DevScreen, OpsScreen, SystemScreen } from './Screens';
 
 type Root = GameState | null;
@@ -64,6 +65,22 @@ export function App() {
   const [term, setTerm] = useState<string | null>(null);
   const [glossary, setGlossary] = useState(false);
   const [help, setHelp] = useState(false);
+  const [tour, setTour] = useState(() => {
+    try {
+      return !localStorage.getItem(TOUR_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const [guideView, setGuideViewRaw] = useState<GuideView>(loadGuideView);
+  const setGuideView = (v: GuideView) => {
+    setGuideViewRaw(v);
+    try {
+      localStorage.setItem(GUIDE_KEY, v);
+    } catch {
+      /* 保存できなくても動く */
+    }
+  };
   const [mode, setModeRaw] = useState<Mode>(loadMode);
   const [screen, setScreenRaw] = useState<Screen>('main');
   const [sel, setSel] = useState<Selection>(null);
@@ -263,7 +280,27 @@ export function App() {
       )}
       {term && <TermModal id={term} onClose={() => setTerm(null)} />}
       {glossary && <GlossaryModal onClose={() => setGlossary(false)} onPick={(id) => setTerm(id)} />}
-      {help && <HelpModal onClose={() => setHelp(false)} />}
+      <GuidePanel view={guideView} setView={setGuideView} onTour={() => setTour(true)} />
+      {tour && !state.gameOver && (
+        <Tour
+          onClose={() => {
+            setTour(false);
+            // 案内が終わったら、広い画面では「次にやること」を開いておく
+            if (guideView === 'min' && window.innerWidth >= 700) setGuideView('open');
+          }}
+        />
+      )}
+      {help && (
+        <HelpModal
+          onClose={() => setHelp(false)}
+          onTour={() => {
+            setHelp(false);
+            setTour(true);
+          }}
+          guideOn={guideView !== 'off'}
+          onGuide={() => setGuideView(guideView === 'off' ? 'open' : 'off')}
+        />
+      )}
     </GameCtx.Provider>
   );
 }
@@ -455,11 +492,23 @@ function GlossaryModal({ onClose, onPick }: { onClose: () => void; onPick: (id: 
   );
 }
 
-function HelpModal({ onClose }: { onClose: () => void }) {
+function HelpModal({ onClose, onTour, guideOn, onGuide }: { onClose: () => void; onTour: () => void; guideOn: boolean; onGuide: () => void }) {
   return (
     <Modal onClose={onClose} wide>
       <h2>遊び方</h2>
       <div className="stack">
+        <div className="card soft stack tight">
+          <b>チュートリアル</b>
+          <div className="small">画面の各場所を順番に案内します。左下の「次にやること」には、いまの段階でやることが順番に出て、終わると ✓ がつきます。</div>
+          <div className="row">
+            <button className="btn primary" onClick={onTour}>
+              ▶ 画面の案内を見る
+            </button>
+            <button className="btn" onClick={onGuide}>
+              {guideOn ? '「次にやること」を隠す' : '「次にやること」を表示する'}
+            </button>
+          </div>
+        </div>
         <p>
           <b>司令室</b>が基本の画面です。左に「対応が必要なこと」、中央にシステムの構成図、右に詳しい説明と対応の候補、下に満足度・安定性・処理速度・安全性・進み具合・運用コストが出ます。左の項目を選ぶと構成図の関係する機器が光り、機器を選ぶと性能や費用、壊れたときの影響が見られます。上の ▶ で時間が進み、障害や攻撃が起きると自動で一時停止します。
         </p>
