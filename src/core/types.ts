@@ -3,6 +3,7 @@
 // ゲームの「データの形」をすべてここにまとめています。
 // 新しい要素を足すときは、まずここに型を追加してください。
 // ============================================================
+import type { Block, BlockKind, Goal, ProgramResult, SortAlgo, SortKey } from './program';
 
 /** スキルの種類（メンバーの得意分野） */
 export type SkillKey = 'plan' | 'dev' | 'infra' | 'sec' | 'ops';
@@ -43,6 +44,8 @@ export interface ProcessOption {
   weeklyCost?: number; // 運用費（万円/週）
   satisfaction?: number; // 満足度ボーナス
   terms?: string[]; // 関係する用語ID
+  /** ブロックで作ったプログラムがこの方式とみなされる条件（使うブロック・並べ替えの方法と順番。計算量も一致が必要） */
+  recipe?: { uses: BlockKind[]; algo?: SortAlgo; key?: SortKey };
 }
 
 /** 業務の中の「処理」。どの方式で実装するか選ぶ */
@@ -53,6 +56,14 @@ export interface ProcessDef {
   dataKey: string; // 処理するデータ（CaseDef.data の key）
   callsPerRequest?: number; // online のとき、1リクエストあたり何回呼ばれるか（平均）
   options: ProcessOption[];
+  /** ブロックでプログラムを作るときの目的（find=探す update=探して更新 next=次の順番 order=並べ替え） */
+  program?: { goal: Goal; keys?: SortKey[]; target: string };
+}
+
+/** ブロックで作ったプログラム（設計に保存する） */
+export interface SavedProgram {
+  blocks: Block[];
+  result: ProgramResult;
 }
 
 /** 問題が「解決した」とみなす条件 */
@@ -215,7 +226,8 @@ export interface Backup {
 
 export interface Design {
   dataModel: Record<string, string>; // 属性ID → テーブルID
-  processes: Record<string, string>; // 処理ID → 選択肢ID
+  processes: Record<string, string>; // 処理ID → 選択肢ID（'custom' = ブロックで作った自作プログラム）
+  programs?: Record<string, SavedProgram>; // 処理ID → ブロックで作ったプログラム
   infra: Infra;
   measures: string[]; // 導入する対策ID
   backup: Backup;

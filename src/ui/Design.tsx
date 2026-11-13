@@ -4,6 +4,7 @@ import { BACKUP_INTERVALS, BACKUP_TYPES, COMPLEXITY_LABEL, DB_TIERS, MEASURES, N
 import {
   backupMetrics,
   batchTime,
+  chosenOption,
   dataAt,
   dataModelScore,
   evaluateLoad,
@@ -21,6 +22,7 @@ import { caseById } from '../core/cases';
 import { describeCond, designWarnings, isSolved, totalEffort } from '../core/project';
 import type { Backup, CaseDef, Infra, Project, Tier } from '../core/types';
 import { Seg, T, TermList, man, useGame } from './common';
+import { ProgramEditor } from './Program';
 
 type Tab = 'data' | 'process' | 'infra' | 'security' | 'backup' | 'review';
 
@@ -171,6 +173,7 @@ export function ProcessTab() {
   const p = s.project!;
   const c = caseById(p.caseId);
   const data = dataAt(c, c.deadlineWeeks);
+  const [howOf, setHow] = useState<Record<string, 'pick' | 'block'>>({});
   return (
     <div className="stack">
       <div className="card small">
@@ -190,6 +193,22 @@ export function ProcessTab() {
               </span>
             </div>
             <div className="small">{pr.desc}</div>
+            {pr.program && (
+              <Seg
+                value={(howOf[pr.id] ?? (p.design.processes[pr.id] === 'custom' ? 'block' : 'pick')) as 'pick' | 'block'}
+                options={[
+                  { v: 'pick', label: '方式を選ぶ' },
+                  { v: 'block', label: '🧩 ブロックで作る' },
+                ]}
+                onChange={(v) => setHow({ ...howOf, [pr.id]: v })}
+              />
+            )}
+            {p.design.processes[pr.id] === 'custom' && (
+              <div className="goodbox small">✓ 自分で作ったプログラム（{COMPLEXITY_LABEL[chosenOption(c, p.design, pr.id).complexity]}）を使っています</div>
+            )}
+            {pr.program && (howOf[pr.id] ?? (p.design.processes[pr.id] === 'custom' ? 'block' : 'pick')) === 'block' ? (
+              <ProgramEditor proc={pr} n={n} known={known} />
+            ) : (
             <div className="options">
               {pr.options.map((o) => {
                 const on = p.design.processes[pr.id] === o.id;
@@ -218,6 +237,7 @@ export function ProcessTab() {
                 );
               })}
             </div>
+            )}
           </div>
         );
       })}

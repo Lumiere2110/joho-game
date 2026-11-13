@@ -4,7 +4,7 @@
 // 描画は UI（Diagram.tsx）が行い、ここでは位置・状態・説明だけを決める。
 // ============================================================
 import { DB_TIERS, MEASURES, NETWORKS, WEB_TIERS } from './catalog';
-import { backupMetrics, batchTime, dataAt, evaluateLoad, systemAvailability } from './calc';
+import { backupMetrics, batchTime, chosenOption, dataAt, evaluateLoad, systemAvailability } from './calc';
 import { caseById } from './cases';
 import type { CaseDef, GameState, Incident, Project } from './types';
 
@@ -132,7 +132,7 @@ export function buildTopology(s: GameState): Topology {
   const dbt = DB_TIERS[i.dbTier];
   add({ id: 'db', type: 'db', label: 'データベース', sub: dbt.name, x: 745, y: 220, state: stateOf(dbU), util: dbU, stateText: utilText(dbU) });
   if (i.dbReplica) add({ id: 'replica', type: 'replica', label: '予備DB（レプリカ）', sub: '常に同じ内容', x: 745, y: 360, state: 'ok', stateText: '待機中' });
-  const hasBatch = c.processes.some((pr) => pr.options.find((o) => o.id === d.processes[pr.id])?.mode === 'batch');
+  const hasBatch = c.processes.some((pr) => chosenOption(c, d, pr.id).mode === 'batch');
   if (hasBatch) {
     const data = p.ops?.data && Object.keys(p.ops.data).length ? p.ops.data : dataAt(c, c.deadlineWeeks);
     const bt = last ? last.batchTime : batchTime(c, d, data);

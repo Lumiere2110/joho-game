@@ -6,6 +6,7 @@
 import { MEASURES, measureById } from './catalog';
 import { infraCost, measuresCost } from './calc';
 import { caseById } from './cases';
+import { COMPLEXITY_TEXT, blockDef, runProgram, type Block } from './program';
 import { buildTasks, canRelease, deadlineWeek, initialSatisfaction, isSolved, newProject, taskDone } from './project';
 import { Rng } from './rng';
 import { devWeek, log, opsWeek, passWeek } from './sim';
@@ -27,6 +28,7 @@ export type Action =
   | { type: 'confirmRequirements' }
   | { type: 'setDataModel'; attr: string; table: string }
   | { type: 'setProcess'; proc: string; option: string }
+  | { type: 'setProgram'; proc: string; blocks: Block[] }
   | { type: 'setInfra'; patch: Partial<Infra> }
   | { type: 'toggleMeasure'; id: string }
   | { type: 'setBackup'; patch: Partial<Backup> }
@@ -252,6 +254,22 @@ function apply(s: GameState, a: Action, rng: Rng) {
       const o = c.processes.find((x) => x.id === a.proc)?.options.find((x) => x.id === a.option);
       learn(s, o?.terms);
       learn(s, ['big-o']);
+      return;
+    }
+    case 'setProgram': {
+      // ブロックで作ったプログラムを実行・テストし、合格したら設計に使う
+      if (p.phase !== 'design') return;
+      const proc = c.processes.find((x) => x.id === a.proc);
+      if (!proc?.program) return;
+      const result = runProgram(proc, a.blocks);
+      p.design.programs = { ...(p.design.programs ?? {}), [a.proc]: { blocks: structuredClone(a.blocks), result } };
+      if (result.ok) {
+        p.design.processes[a.proc] = result.optionId ?? 'custom';
+        const o = proc.options.find((x) => x.id === result.optionId);
+        learn(s, o?.terms);
+        learn(s, ['big-o', ...result.uses.map((u) => blockDef(u).term).filter((x): x is string => !!x)]);
+        log(s, `プログラム「${proc.name}」がテストに合格しました（${COMPLEXITY_TEXT[result.complexity!]}${o ? `・「${o.name}」と同じ方式` : '・自作の方式'}）。`, 'good');
+      }
       return;
     }
     case 'setInfra': {

@@ -453,3 +453,41 @@ details.inc summary { cursor: pointer; font-size: 14px; }
   .diagram-scroll > svg { height: auto; }
   .tb-stats { gap: 6px 16px; }
 }
+
+/* ---- ブロックでプログラムを作る ---- */
+.bad-t { color: var(--bad); }
+.prog-grid { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: start; }
+.palette { display: flex; flex-direction: column; gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 10px; }
+.pal { text-align: left; border: 1px solid var(--border); border-left-width: 4px; background: var(--surface); color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: 13px; cursor: pointer; }
+.pal:hover { background: var(--surface-3); }
+.pal + .pal { margin-top: 4px; }
+.g-control { border-left-color: var(--warn) !important; }
+.g-action { border-left-color: var(--good) !important; }
+.g-structure { border-left-color: var(--data) !important; }
+.workspace { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.blist { display: flex; flex-direction: column; gap: 4px; border-radius: 8px; padding: 4px; }
+.blist.target { outline: 1px dashed var(--accent); background: var(--accent-soft); }
+.blist .blist { margin: 4px 0 2px 18px; border-left: 2px solid var(--border); padding-left: 8px; }
+.blk { border: 1px solid var(--border); border-left-width: 4px; background: var(--surface-2); border-radius: 6px; padding: 4px 6px; }
+.blk-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.blk-name { font-weight: 700; font-size: 13px; }
+.blk select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 5px; font-size: 12px; padding: 2px 4px; }
+.blk-tools { margin-left: auto; display: inline-flex; gap: 2px; }
+.blk-tools button { background: transparent; border: 1px solid transparent; color: var(--text-2); border-radius: 4px; cursor: pointer; padding: 0 6px; font-size: 12px; }
+.blk-tools button:hover:not(:disabled) { border-color: var(--border); background: var(--surface); }
+.blk-tools button:disabled { opacity: 0.3; cursor: default; }
+.slot { align-self: flex-start; background: transparent; border: 1px dashed var(--border); color: var(--muted); border-radius: 6px; font-size: 12px; padding: 2px 8px; cursor: pointer; }
+.blist.target > .slot { border-color: var(--accent); color: var(--accent); }
+textarea.code { width: 100%; box-sizing: border-box; font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px; resize: vertical; }
+.cx-scale { display: flex; flex-direction: column; gap: 3px; }
+.cx { display: grid; grid-template-columns: 90px 1fr 70px auto; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.cx.on { color: var(--text); font-weight: 700; }
+.cx-bar { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; }
+.cx-bar i { display: block; height: 100%; background: var(--axis); border-radius: 3px; }
+.cx.on .cx-bar i { background: var(--data); }
+.cx-v { text-align: right; }
+@media (max-width: 640px) {
+  .prog-grid { grid-template-columns: 1fr; }
+  .cx { grid-template-columns: 70px 1fr 60px; }
+  .cx > .tiny { grid-column: 1 / -1; }
+}

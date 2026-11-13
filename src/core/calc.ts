@@ -40,6 +40,25 @@ export function opsCount(c: Complexity, n: number): number {
 
 export function chosenOption(c: CaseDef, d: Design, procId: string): ProcessOption {
   const p = c.processes.find((x) => x.id === procId)!;
+  if (d.processes[procId] === 'custom') {
+    // ブロックで作った自作プログラム：実行して数えた計算量で性能を計算する
+    const prog = d.programs?.[procId];
+    const cx = prog?.result.ok ? prog.result.complexity : undefined;
+    if (cx) {
+      const count = (bs: { body?: unknown[] }[]): number => bs.reduce((a, b) => a + 1 + count((b.body ?? []) as { body?: unknown[] }[]), 0);
+      const names: Record<string, string> = { '1': 'O(1)', logn: 'O(log n)', n: 'O(n)', nlogn: 'O(n log n)', n2: 'O(n²)' };
+      return {
+        id: 'custom',
+        name: `自作プログラム（${names[cx]}）`,
+        desc: 'ブロックで作った処理。実行して数えた計算量で性能を計算する。',
+        complexity: cx,
+        mode: p.program?.goal === 'order' ? 'batch' : 'online',
+        costPerOp: p.options[0].costPerOp,
+        effort: Math.round((0.2 + count(prog!.blocks) * 0.1) * 10) / 10,
+        terms: ['big-o'],
+      };
+    }
+  }
   return p.options.find((o) => o.id === d.processes[procId]) ?? p.options[0];
 }
 

@@ -157,24 +157,26 @@ export const clinic: CaseDef = {
   processes: [
     {
       id: 'slot',
+      program: { goal: 'find', target: '希望の予約枠（番号）を、すべての枠の中から見つける' },
       name: '空き枠の検索',
       desc: '予約画面で、空いている時間を探す。',
       dataKey: 'slots',
       callsPerRequest: 0.6,
       options: [
-        { id: 'slot-linear', name: '線形探索（全枠を順番に調べる）', desc: '作るのは簡単。枠が増えるほど遅くなる。', complexity: 'n', mode: 'online', costPerOp: 2e-5, effort: 0, terms: ['linear-search'] },
-        { id: 'slot-index', name: '日付のインデックスを使う', desc: '日付で索引をつけて、その日の枠だけを調べる。', complexity: 'logn', mode: 'online', costPerOp: 2e-4, effort: 0.5, terms: ['index', 'binary-search'] },
+        { id: 'slot-linear', recipe: { uses: ['each'] }, name: '線形探索（全枠を順番に調べる）', desc: '作るのは簡単。枠が増えるほど遅くなる。', complexity: 'n', mode: 'online', costPerOp: 2e-5, effort: 0, terms: ['linear-search'] },
+        { id: 'slot-index', recipe: { uses: ['index'] }, name: '日付のインデックスを使う', desc: '日付で索引をつけて、その日の枠だけを調べる。', complexity: 'logn', mode: 'online', costPerOp: 2e-4, effort: 0.5, terms: ['index', 'binary-search'] },
       ],
     },
     {
       id: 'waiting',
+      program: { goal: 'next', target: '次に呼ぶ患者（一番早く受付した人）を見つける' },
       name: '順番待ちの管理',
       desc: '受付順に診察の順番を管理し、患者さんに知らせる。',
       dataKey: 'waiting',
       callsPerRequest: 1,
       options: [
-        { id: 'wait-scan', name: '毎回、受付記録をすべて調べて順番を数える', desc: '受付表を毎回先頭から数える。', complexity: 'n', mode: 'online', costPerOp: 3e-4, effort: 0, terms: ['linear-search'] },
-        { id: 'wait-queue', name: 'キュー（FIFO）で順番を管理する', desc: '受付順に並べ、先頭から呼ぶ。自分の位置もすぐ分かる。', complexity: '1', mode: 'online', costPerOp: 5e-4, effort: 0.5, satisfaction: 2, terms: ['queue'] },
+        { id: 'wait-scan', recipe: { uses: ['each'] }, name: '毎回、受付記録をすべて調べて順番を数える', desc: '受付表を毎回先頭から数える。', complexity: 'n', mode: 'online', costPerOp: 3e-4, effort: 0, terms: ['linear-search'] },
+        { id: 'wait-queue', recipe: { uses: ['queue', 'first'] }, name: 'キュー（FIFO）で順番を管理する', desc: '受付順に並べ、先頭から呼ぶ。自分の位置もすぐ分かる。', complexity: '1', mode: 'online', costPerOp: 5e-4, effort: 0.5, satisfaction: 2, terms: ['queue'] },
       ],
     },
   ],

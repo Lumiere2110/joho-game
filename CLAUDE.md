@@ -14,6 +14,7 @@
   - `sim.ts` 1週間ごとの開発・運用シミュレーション
   - `game.ts` すべての操作（Action）と reducer。UI は dispatch するだけ
   - `staff.ts` メンバー、採用候補、作業量
+  - `program.ts` ブロックのプログラム（ブロックの種類 `BLOCKS`、実行・操作回数の計測 `runProgram`、計算量の判定、コード⇔ブロック変換）。案件の処理に `program`（目的・テストの種類）と各方式に `recipe`（使うブロック）を書くと、プレイヤーのプログラムがその方式に対応づけられる。どれとも違えば `custom`（`calc.ts` の `chosenOption`）
   - 司令室の表示用データ（純粋関数・`view.test.ts` でテスト）
     - `issues.ts` 左の「対応が必要なこと」（何が・影響・期限・放置したら・関係する機器・対応候補 Action）。新しい問題・イベントはここに項目を足す
     - `topology.ts` 構成図のノード・エッジ・状態（ok/busy/down/attack/off）と `NODE_ROLE` の説明
@@ -26,6 +27,7 @@
   - `CommandCenter.tsx` 司令室（左 IssueList／中央 Diagram／右 IssueDetail・NodeDetail／下 StatusBar）
   - `Diagram.tsx`・`Icons.tsx` 構成図とアイコン（形で役割、色＋記号＋文字で状態）
   - `Screens.tsx` システム／業務／開発／運用・セキュリティ／管理 画面。フェーズ別の部品（Investigate・Design・Develop・Operate など）を組み合わせる
+  - `Program.tsx` ブロックでプログラムを作る画面（設計の処理タブ。詳細表示ではコードでも書ける）
   - `common.tsx` 用語リンク `<T id>`・`TermNote`（用語＋短い説明）・グラフ・画面の共通状態（mode/screen/sel）
 - 色の意味：青=データ・通信、緑=正常、黄=高負荷・要確認、赤=障害・緊急、紫=セキュリティ、灰=停止。色だけに頼らず記号か文字を必ず添える。
 - `tools/balance.test.ts` … バランス確認（`npx vitest run tools --silent=false`）

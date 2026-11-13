@@ -4,7 +4,7 @@
 // それぞれに「何が起きているか・影響・期限・放置したら・関係する機器・対応候補」をつける。
 // ============================================================
 import { BACKUP_INTERVALS, MEASURES, THREATS, requiredLegal } from './catalog';
-import { backupMetrics, dataAt, evaluateLoad, fmt, fmtTime, infraCost, singlePoints, systemAvailability } from './calc';
+import { backupMetrics, chosenOption, dataAt, evaluateLoad, fmt, fmtTime, infraCost, singlePoints, systemAvailability } from './calc';
 import { CASES, caseById } from './cases';
 import type { Action } from './game';
 import { budgetFor, canRelease, deadlineWeek, describeCond, designWarnings, isSolved, taskDone } from './project';
@@ -630,7 +630,7 @@ export function buildIssues(s: GameState): Issue[] {
 export function batchActions(c: CaseDef, p: Project): IssueAction[] {
   const out: IssueAction[] = [];
   for (const pr of c.processes) {
-    const cur = pr.options.find((o) => o.id === p.design.processes[pr.id]);
+    const cur = chosenOption(c, p.design, pr.id);
     if (cur?.mode !== 'batch') continue;
     out.push({
       label: `${pr.name}の方式を見直す`,

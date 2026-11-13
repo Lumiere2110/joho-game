@@ -165,25 +165,27 @@ export const library: CaseDef = {
   processes: [
     {
       id: 'search',
+      program: { goal: 'find', target: '書名から選んだ本（番号）を、15万冊の中から見つける' },
       name: '蔵書検索',
       desc: '書名や著者名で本を探す。全リクエストの半分で使われる。',
       dataKey: 'books',
       callsPerRequest: 0.5,
       options: [
-        { id: 'lsearch-linear', name: '線形探索（全件を順番に調べる）', desc: '作るのは簡単。15万冊を毎回すべて調べる。', complexity: 'n', mode: 'online', costPerOp: 5e-6, effort: 0, terms: ['linear-search'] },
-        { id: 'lsearch-index', name: 'インデックス（B+木）を使う', desc: '書名・著者名に索引をつける。', complexity: 'logn', mode: 'online', costPerOp: 2e-4, effort: 0.5, terms: ['index'] },
+        { id: 'lsearch-linear', recipe: { uses: ['each'] }, name: '線形探索（全件を順番に調べる）', desc: '作るのは簡単。15万冊を毎回すべて調べる。', complexity: 'n', mode: 'online', costPerOp: 5e-6, effort: 0, terms: ['linear-search'] },
+        { id: 'lsearch-index', recipe: { uses: ['index'] }, name: 'インデックス（B+木）を使う', desc: '書名・著者名に索引をつける。', complexity: 'logn', mode: 'online', costPerOp: 2e-4, effort: 0.5, terms: ['index'] },
         { id: 'lsearch-fulltext', name: '全文検索エンジンを導入', desc: '単語の索引で速く、あいまい検索もできる。', complexity: 'logn', mode: 'online', costPerOp: 1e-4, effort: 1.5, weeklyCost: 2, satisfaction: 3, terms: ['fulltext'] },
       ],
     },
     {
       id: 'queue',
+      program: { goal: 'next', target: '本が返ってきたとき、一番早く予約した人を見つける' },
       name: '予約の順番管理',
       desc: '本が返ってきたとき、次に貸す人を決める。',
       dataKey: 'queue',
       callsPerRequest: 0.05,
       options: [
-        { id: 'queue-sort', name: '毎回、予約日時で全件を並べ替える', desc: '予約一覧を予約日時でソートして、一番古い人を探す。', complexity: 'nlogn', mode: 'online', costPerOp: 2e-6, effort: 0, terms: ['merge-sort'] },
-        { id: 'queue-fifo', name: '本ごとのキュー（FIFO）で管理する', desc: '予約を受けた順に並べておき、先頭を取り出す。', complexity: '1', mode: 'online', costPerOp: 5e-4, effort: 0.5, terms: ['queue'] },
+        { id: 'queue-sort', recipe: { uses: ['sort', 'first'], key: 'time' }, name: '毎回、予約日時で全件を並べ替える', desc: '予約一覧を予約日時でソートして、一番古い人を探す。', complexity: 'nlogn', mode: 'online', costPerOp: 2e-6, effort: 0, terms: ['merge-sort'] },
+        { id: 'queue-fifo', recipe: { uses: ['queue', 'first'] }, name: '本ごとのキュー（FIFO）で管理する', desc: '予約を受けた順に並べておき、先頭を取り出す。', complexity: '1', mode: 'online', costPerOp: 5e-4, effort: 0.5, terms: ['queue'] },
       ],
     },
   ],
