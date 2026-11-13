@@ -6,7 +6,7 @@ import { backupMetrics, batchTime, dataAt, dataModelScore, evaluateLoad, fmtTime
 import { DEV_KINDS, taskDone } from './project';
 import type { Rng } from './rng';
 import { gainExp, workRate } from './staff';
-import type { CaseDef, GameState, OpsWeekResult, Project, Task } from './types';
+import type { CaseDef, GameState, Incident, OpsWeekResult, Project, Task, ThreatId } from './types';
 
 type Ev = OpsWeekResult['events'][number];
 
@@ -112,6 +112,10 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
   const d = p.design;
   const ev: Ev[] = [];
   const say = (text: string, kind: Ev['kind'] = 'info') => ev.push({ text, kind });
+  // 構成図に表示するための、障害・攻撃の記録
+  const incidents: Incident[] = [];
+  let curThreat: ThreatId | undefined; // いま処理している脅威（攻撃・事故のときだけ）
+  const hit = (node: string, kind: Incident['kind'], title: string, steps: string[] = []) => incidents.push({ node, kind, title, steps, ...(curThreat ? { threat: curThreat } : {}) });
   let sat = 0;
 
   // 予約していた構成変更を反映
@@ -185,32 +189,55 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
     if (alive === 0) {
       outage += mttr;
       say(`Webサーバーが故障し、サービスが ${mttr.toFixed(1)} 時間止まりました。`, 'bad');
-    } else say(`Webサーバー ${servers - alive} 台が故障しましたが、残りの台数で動き続けました（冗長化の効果）。`, 'good');
+      hit('web', 'failure', 'Webサーバーが全台停止', [
+        `監視で故障に気づく（${monitorPower > 0 ? '監視あり' : '監視なし：気づくのが遅れた'}）`,
+        '予備の機器がないため、修理・交換する',
+        `サービス再開まで ${mttr.toFixed(1)} 時間`,
+      ]);
+    } else {
+      say(`Webサーバー ${servers - alive} 台が故障しましたが、残りの台数で動き続けました（冗長化の効果）。`, 'good');
+      hit('web', 'degraded', `Webサーバー ${servers - alive} 台が故障（ほかの台数で継続）`, ['ロードバランサが故障した台を自動で外す', '残りの台数でサービスを続ける', '故障した台を修理して戻す']);
+    }
   }
   if (d.infra.lb && rng.chance(0.004)) {
     outage += mttr;
     say(`ロードバランサが故障し、${mttr.toFixed(1)} 時間止まりました（単一障害点）。`, 'bad');
+    hit('lb', 'failure', 'ロードバランサが故障（単一障害点）', ['すべての通信がここを通るため、全体が止まる', `交換して復旧（${mttr.toFixed(1)} 時間）`]);
   }
   const bk = backupMetrics(d.backup, ops.dataGB);
+  const restoreSteps = () => {
+    const b = d.backup;
+    const chain =
+      b.type === 'full'
+        ? '最新のフルバックアップを1つ戻す'
+        : b.type === 'diff'
+          ? 'フルバックアップを戻し、最新の差分を1つ重ねる'
+          : 'フルバックアップを戻し、そのあとの増分を順番にすべて重ねる';
+    return [`${chain}（約 ${bk.rtoHours.toFixed(1)} 時間）`, `最後のバックアップ以降のデータ（最大 ${bk.rpoHours} 時間分）は失われる`, '動作を確認してサービス再開'];
+  };
   if (rng.chance(rel.failPerWeek)) {
     if (d.infra.dbReplica) {
       outage += 0.1;
       say('DBサーバーが故障しましたが、予備（レプリカ）に自動で切り替わりました（フェイルオーバー）。', 'good');
+      hit('db', 'degraded', 'DBサーバーが故障（レプリカへ切り替え）', ['故障を検知', '予備（レプリカ）に自動で切り替え（フェイルオーバー）', '数分でサービス継続', '故障した機器を交換し、新しい予備にする']);
     } else if (d.backup.type === 'none') {
       outage += mttr + 48;
       sat -= 25;
       p.repPenalty += 3;
       say('DBサーバーが故障！ バックアップがなく、データの多くを失いました…', 'bad');
+      hit('db', 'failure', 'DBサーバーが故障・データ消失', ['故障を検知', 'バックアップがないため、データを戻せない', '残ったデータと紙の記録から手作業で復旧（約2日）']);
     } else {
       const lost = bk.rpoHours / 2;
       outage += mttr + bk.rtoHours;
       sat -= Math.min(12, 2 + lost * 0.25);
       say(`DBサーバーが故障。バックアップから復元しました（復旧 ${(mttr + bk.rtoHours).toFixed(1)} 時間、約 ${lost.toFixed(0)} 時間分のデータを失った）。`, 'bad');
+      hit('db', 'failure', 'DBサーバーが故障・バックアップから復元', [`故障を検知し、新しい機器を用意（${mttr.toFixed(1)} 時間）`, ...restoreSteps()]);
     }
   }
 
   // 攻撃・事故
   for (const th of THREATS) {
+    curThreat = th.id;
     const weight = c.threats[th.id] ?? 0;
     if (!weight) continue;
     let prob = th.basePerWeek * weight;
@@ -237,38 +264,51 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
       }
       if (impact < 0.5) say('保存データの暗号化などで、漏れたデータの多くは読めない状態でした。', 'info');
       p.repPenalty += rep;
+      hit(th.id === 'eavesdrop' ? 'internet' : 'db', 'attack', `${th.name}による情報漏えい`, [
+        '不正なアクセスを検知し、通信を遮断する',
+        '漏えいした範囲を調べる（ログを確認）',
+        d.measures.includes('breach') ? '手順どおり、本人と個人情報保護委員会へ報告' : '報告の手順がなく、対応が遅れた',
+        '原因となった弱点をふさぐ対策を入れる',
+      ]);
     } else if (th.effect === 'tamper') {
       sat -= 6;
       say(`${th.name}で、サイトに不正なスクリプトが埋め込まれました。`, 'bad');
+      hit('web', 'attack', `${th.name}でページが改ざん`, ['埋め込まれたスクリプトを削除', '入力・出力の処理を見直す（エスケープ処理）']);
     } else if (th.effect === 'outage') {
       const h = 12 * (d.infra.cdn ? 0.6 : 1);
       outage += h;
       say(`${th.name}を受け、${h.toFixed(0)} 時間つながりにくくなりました。`, 'bad');
+      hit('edge', 'attack', `${th.name}で回線があふれた`, ['大量の通信を検知', '攻撃元からの通信を遮断・吸収する', `${h.toFixed(0)} 時間後に平常に戻る`]);
     } else if (th.effect === 'ransom') {
       const backupSafe = d.backup.type !== 'none' && (d.backup.offsite || rng.chance(0.4));
       if (backupSafe) {
         outage += bk.rtoHours + mttr;
         sat -= 10;
         say(`ランサムウェアに感染！ 無事だったバックアップから復元しました（${(bk.rtoHours + mttr).toFixed(1)} 時間停止）。`, 'bad');
+        hit('db', 'attack', 'ランサムウェア感染・バックアップから復元', ['感染した機器をネットワークから切り離す', 'ウイルスを除去し、機器を初期化する', ...restoreSteps()]);
       } else {
         outage += 96;
         sat -= 30;
         p.repPenalty += 6;
         say(d.backup.type === 'none' ? 'ランサムウェアに感染！ バックアップがなく、データを取り戻せませんでした…' : 'ランサムウェアに感染！ 同じネットワークにあったバックアップまで暗号化されてしまいました…', 'bad');
+        hit('db', 'attack', 'ランサムウェア感染・データを戻せない', ['感染した機器をネットワークから切り離す', d.backup.type === 'none' ? 'バックアップがない' : 'バックアップも暗号化されていた（遠隔地に置いていなかった）', '手作業でデータを作り直す（約4日）']);
       }
     } else if (th.effect === 'dataloss') {
       if (d.backup.type === 'none') {
         sat -= 18;
         p.repPenalty += 2;
         say('担当者の誤操作で大事なデータが消えました。バックアップがなく復元できません…', 'bad');
+        hit('db', 'failure', '誤操作でデータ削除・復元できない', ['削除に気づく', d.infra.dbReplica ? 'レプリカにも削除がコピーされていた' : 'バックアップがない', '手作業でデータを作り直す']);
       } else {
         outage += bk.rtoHours;
         sat -= Math.min(10, 1 + bk.rpoHours * 0.2);
         const extra = d.infra.dbReplica ? '（レプリカにも削除がコピーされたので、バックアップが必要でした）' : '';
         say(`誤操作でデータが消えましたが、バックアップから復元しました${extra}。`, 'bad');
+        hit('db', 'failure', '誤操作でデータ削除・バックアップから復元', ['削除に気づく', ...(d.infra.dbReplica ? ['レプリカにも削除がコピーされているので使えない'] : []), ...restoreSteps()]);
       }
     }
   }
+  curThreat = undefined;
 
   // 残っているバグ
   let bugIncidents = 0;
@@ -277,12 +317,14 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
     sat -= bugIncidents * 1.5;
     outage += bugIncidents * 0.5;
     say(`バグによる不具合が ${bugIncidents} 件発生しました。`, 'bad');
+    hit("web", "warning", `バグによる不具合 ${bugIncidents} 件`, ["不具合の報告を受ける", "原因を調べて修正する（バグ修正の担当者が必要）"]);
   }
   // データベース設計の不備による食い違い
   const dmScore = dataModelScore(c, d);
   if (rng.chance((1 - dmScore) * 0.5)) {
     sat -= 3;
     say('同じデータが複数の場所にあり、一部だけ更新されて内容が食い違いました（更新時異常）。', 'bad');
+    hit("db", "warning", "データの食い違い（更新時異常）", ["食い違ったデータを手で直す", "表の設計（正規化）を見直すと根本的に防げる"]);
   }
 
   // 負荷
@@ -291,6 +333,7 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
     sat -= Math.min(15, load.lostRate * 30);
     const where = load.bottleneck === 'db' ? 'データベース' : load.bottleneck === 'net' ? '回線' : 'Webサーバー';
     say(`アクセスが集中し、${where}が処理しきれず、約 ${(load.lostRate * 100).toFixed(0)}% のアクセスがエラーに。`, 'bad');
+    hit(load.bottleneck === "db" ? "db" : load.bottleneck === "net" ? "internet" : "web", "overload", `${where}が混雑してエラー多発`, [`${where}の利用率が100%を超えた`, "処理しきれない分がエラーになる", "台数を増やす・性能を上げる・処理を速くする（アルゴリズム）などで改善"]);
   } else if (load.response <= c.responseTarget) sat += 1;
   else if (load.response > c.responseTarget * 2) {
     sat -= 3;
@@ -302,6 +345,7 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
   if (bt > c.batchWindow) {
     sat -= 4;
     say(`夜間バッチが ${fmtTime(bt)} かかり、朝までに終わりませんでした。`, 'bad');
+    hit("batch", "overload", "夜間バッチが時間内に終わらない", ["データが増えて処理時間が伸びた", "計算量の小さいアルゴリズムに変えると速くなる"]);
   }
 
   // 監査（個人情報の扱い）
@@ -356,6 +400,9 @@ export function opsWeek(s: GameState, c: CaseDef, rng: Rng) {
     cost,
     revenue: fee,
     events: ev,
+    dbRho: load.dbRho,
+    netRho: load.netRho,
+    incidents,
   });
   if (p.lowSatWeeks >= 3) {
     ev.push({ text: "満足度が低い状態が続き、依頼主から保守契約を打ち切られました…", kind: "bad" });

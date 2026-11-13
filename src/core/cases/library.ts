@@ -205,6 +205,17 @@ export const library: CaseDef = {
       { id: 'b-res-date', name: '予約日時', answer: ['reservation'], note: '予約ごとに決まる情報。順番を決めるのに使います。' },
     ],
   },
+  workflow: {
+    unit: '予約1件',
+    perDay: 120,
+    steps: [
+      { id: 'l-call', name: '電話・窓口で予約を受ける', actor: '職員', work: 4, wait: 0, manual: true, reveal: 'staff', after: { problem: "l-reserve", work: 0, wait: 0, note: '利用者がWebで予約する' } },
+      { id: 'l-book', name: '紙の台帳に書き、順番を確かめる', actor: '職員', work: 3, wait: 0, manual: true, duplicate: true, reveal: 'staff', note: '同じ内容を台帳とシステムに書いている', after: { problem: "l-order", work: 0.2, wait: 0, note: 'キューで順番を自動管理' } },
+      { id: 'l-next', name: '本が戻ったら、次に貸す人を探す', actor: '職員', work: 2, wait: 12, manual: true, reveal: 'staff', after: { problem: "l-order", work: 0.2, wait: 1, note: 'キューの先頭がすぐ分かる' } },
+      { id: 'l-post', name: 'はがきで「本が届きました」と知らせる', actor: '職員', work: 3, wait: 48, manual: true, reveal: 'staff', note: '郵送に2日ほどかかる', after: { problem: "l-notice", work: 0, wait: 0.5, note: 'メールで自動連絡' } },
+      { id: 'l-lend', name: '窓口で本を貸し出す', actor: '職員', work: 2, wait: 24, manual: true, note: '利用者が来館するまで待つ' },
+    ],
+  },
   traffic: {
     base: 4,
     growthPerWeek: 0.03,

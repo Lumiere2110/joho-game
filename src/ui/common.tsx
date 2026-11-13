@@ -4,10 +4,42 @@ import type { Action } from '../core/game';
 import { termById } from '../core/glossary';
 import type { GameState } from '../core/types';
 
+import type { Screen } from '../core/issues';
+export type { Screen };
+export type Mode = 'easy' | 'detail';
+/** 司令室で選んでいるもの（左の項目か、構成図の機器） */
+export type Selection = { kind: 'issue'; id: string } | { kind: 'node'; id: string } | null;
+
 export interface Ctx {
   s: GameState;
   dispatch: (a: Action) => void;
   openTerm: (id: string) => void;
+  mode: Mode; // かんたん表示／詳細表示
+  screen: Screen;
+  setScreen: (s: Screen) => void;
+  sel: Selection;
+  setSel: (s: Selection) => void;
+  frozen: boolean; // 一時停止中（アニメーションも止める）
+}
+
+/** 用語の説明の最初の一文（短い説明として横に添える） */
+export function shortTerm(id: string): string {
+  const t = termById(id);
+  if (!t) return '';
+  const i = t.text.indexOf('。');
+  return i >= 0 ? t.text.slice(0, i + 1) : t.text;
+}
+
+/** 用語＋短い説明（例：冗長化 — 機器が故障しても…） */
+export function TermNote({ id }: { id: string }) {
+  const t = termById(id);
+  if (!t) return null;
+  return (
+    <div className="termnote">
+      <T id={id} />
+      <span>{shortTerm(id)}</span>
+    </div>
+  );
 }
 
 export const GameCtx = createContext<Ctx>(null!);

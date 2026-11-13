@@ -197,6 +197,17 @@ export const clinic: CaseDef = {
       { id: 'c-symptom', name: '症状（問診内容）', answer: ['appointment'], note: '受診ごとに変わるので予約（受診）に結びつけます。要配慮個人情報なので扱いに注意。' },
     ],
   },
+  workflow: {
+    unit: '患者1人',
+    perDay: 80,
+    steps: [
+      { id: 'c-tel', name: '電話で予約を受ける', actor: '受付', work: 3, wait: 0, manual: true, reveal: 'reception', note: '朝は電話がつながりにくい', after: { problem: "c-phone", work: 0.3, wait: 0, note: 'Webで予約。受付は確認だけ' } },
+      { id: 'c-paper', name: '来院して紙の問診票を書く', actor: '患者', work: 5, wait: 0.2, manual: true, after: { problem: "c-monshin", work: 0, wait: 0, note: '家でスマホから入力済み' } },
+      { id: 'c-copy', name: '問診票を電子カルテに打ち直す', actor: '受付', work: 4, wait: 0.1, manual: true, duplicate: true, reveal: 'reception', note: '転記ミスが起きることがある', after: { problem: "c-monshin", work: 0, wait: 0, note: '問診データがそのままカルテに入る' } },
+      { id: 'c-wait', name: '待合室で順番を待つ', actor: '患者', work: 0, wait: 1, reveal: 'patient', note: 'いつ呼ばれるか分からず、待合室が混雑', after: { problem: "c-waiting", work: 0, wait: 0.3, note: '順番が近づいたら通知。車や家で待てる' } },
+      { id: 'c-exam', name: '診察を受ける', actor: '医師', work: 10, wait: 0, manual: true },
+    ],
+  },
   traffic: {
     base: 3,
     growthPerWeek: 0.03,

@@ -174,6 +174,7 @@ export interface CaseDef {
   features: Feature[];
   processes: ProcessDef[];
   dataModel: DataPuzzle;
+  workflow: Workflow;
   traffic: {
     base: number; // 平常時のリクエスト数（件/秒）
     growthPerWeek: number;
@@ -282,6 +283,9 @@ export interface OpsWeekResult {
   cost: number;
   revenue: number;
   events: { text: string; kind: 'info' | 'good' | 'bad' }[];
+  dbRho?: number;
+  netRho?: number;
+  incidents?: Incident[];
 }
 
 export interface OpsState {
@@ -363,4 +367,34 @@ export interface GameState {
   log: LogEntry[];
   gameOver: boolean;
   nextId: number;
+}
+
+/** 構成図に表示する障害・攻撃の記録 */
+export interface Incident {
+  node: string; // 構成図のどこで起きたか（web / db / lb / internet / edge / batch）
+  kind: 'failure' | 'degraded' | 'attack' | 'overload' | 'warning';
+  title: string;
+  steps: string[]; // 復旧・対応の手順
+  threat?: ThreatId; // 攻撃・事故のとき、どの脅威だったか
+}
+
+/** 業務の流れ（業務画面） */
+export interface WorkflowStep {
+  id: string;
+  name: string;
+  actor: string; // 担当
+  work: number; // 1件あたりの作業時間（分）
+  wait: number; // 次の工程に進むまでの待ち時間（時間）
+  manual?: boolean; // 手作業
+  duplicate?: boolean; // 同じ内容をもう一度入力するなどの重複作業
+  system?: boolean; // システムが自動で行う
+  note?: string;
+  reveal?: string; // この調査をするまで詳細が分からない
+  after?: { problem: string; work: number; wait: number; note: string }; // この問題が解決すると改善される
+}
+
+export interface Workflow {
+  unit: string; // 「注文1件」など
+  perDay: number; // 1日の件数
+  steps: WorkflowStep[];
 }

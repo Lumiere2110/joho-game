@@ -14,7 +14,20 @@
   - `sim.ts` 1週間ごとの開発・運用シミュレーション
   - `game.ts` すべての操作（Action）と reducer。UI は dispatch するだけ
   - `staff.ts` メンバー、採用候補、作業量
-- `src/ui/` … 画面（フェーズごとに1ファイル）。`common.tsx` に用語リンク `<T id>`・グラフなど。
+  - 司令室の表示用データ（純粋関数・`view.test.ts` でテスト）
+    - `issues.ts` 左の「対応が必要なこと」（何が・影響・期限・放置したら・関係する機器・対応候補 Action）。新しい問題・イベントはここに項目を足す
+    - `topology.ts` 構成図のノード・エッジ・状態（ok/busy/down/attack/off）と `NODE_ROLE` の説明
+    - `status.ts` 下の6つの状態（満足度・安定性・処理速度・安全性・進み具合・運用コスト）
+    - `workflow.ts` 業務画面（案件の `workflow` から改善前後の時間・費用）
+    - `time.ts` 週 → 日付
+  - 運用中の障害・攻撃は `sim.ts` の `hit()` で `Incident`（どの機器・種類・復旧手順・脅威）として記録する
+- `src/ui/` … 画面
+  - `App.tsx` 上部バー（日付・資金・再生/一時停止/早送り・かんたん/詳細）、画面タブ、自動一時停止、変化の通知
+  - `CommandCenter.tsx` 司令室（左 IssueList／中央 Diagram／右 IssueDetail・NodeDetail／下 StatusBar）
+  - `Diagram.tsx`・`Icons.tsx` 構成図とアイコン（形で役割、色＋記号＋文字で状態）
+  - `Screens.tsx` システム／業務／開発／運用・セキュリティ／管理 画面。フェーズ別の部品（Investigate・Design・Develop・Operate など）を組み合わせる
+  - `common.tsx` 用語リンク `<T id>`・`TermNote`（用語＋短い説明）・グラフ・画面の共通状態（mode/screen/sel）
+- 色の意味：青=データ・通信、緑=正常、黄=高負荷・要確認、赤=障害・緊急、紫=セキュリティ、灰=停止。色だけに頼らず記号か文字を必ず添える。
 - `tools/balance.test.ts` … バランス確認（`npx vitest run tools --silent=false`）
 
 ## ルール

@@ -267,6 +267,19 @@ export const ecommerce: CaseDef = {
       { id: 'a-qty', name: '数量', answer: ['line'], note: '「どの注文で・どの商品を・いくつ」なので、注文番号と商品番号の組で決まる注文明細へ。' },
     ],
   },
+  workflow: {
+    unit: '注文1件',
+    perDay: 3000,
+    steps: [
+      { id: 'w-order', name: 'Webサイトで注文を受ける', actor: 'お客様・システム', work: 0, wait: 0, system: true },
+      { id: 'w-list', name: '注文一覧を表にまとめて倉庫へ送る', actor: '事務所', work: 0.5, wait: 14, manual: true, reveal: 'warehouse', note: '朝にまとめて送るので、前日の注文は翌朝まで待つ', after: { problem: "p-ship", work: 0, wait: 0, note: '注文データが自動で倉庫に届く' } },
+      { id: 'w-input', name: '倉庫システムに手で打ち込む', actor: '倉庫', work: 2, wait: 28, manual: true, duplicate: true, reveal: 'orders', note: '同じ内容を2回入力している。1日分で半日かかり、遅れがたまる', after: { problem: "p-ship", work: 0, wait: 0, note: '入力作業がなくなる' } },
+      { id: 'w-stock', name: '在庫を確認する（欠品ならお客様に連絡）', actor: '倉庫', work: 1.5, wait: 4, manual: true, reveal: 'warehouse', after: { problem: "p-stock", work: 0.1, wait: 0, note: '注文時に在庫を引き当て済み' } },
+      { id: 'w-pick', name: '棚から商品を集める（ピッキング）', actor: '倉庫', work: 5, wait: 6, manual: true, reveal: 'warehouse', note: '注文順なので倉庫を何往復もする', after: { problem: "p-picking", work: 3, wait: 3, note: '棚の場所順のリストで歩く距離が半分に' } },
+      { id: 'w-pack', name: '梱包して発送する', actor: '倉庫', work: 3, wait: 8, manual: true, note: '配送会社の集荷を待つ' },
+      { id: 'w-ask', name: '「いつ届く？」の問い合わせに答える', actor: 'サポート', work: 1.5, wait: 0, manual: true, reveal: 'support', note: '注文の半分以上で問い合わせがある', after: { problem: "p-inquiry", work: 0.3, wait: 0, note: 'メールと追跡ページで自分で確認できる' } },
+    ],
+  },
   traffic: {
     base: 25,
     growthPerWeek: 0.02,

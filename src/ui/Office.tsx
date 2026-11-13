@@ -54,7 +54,7 @@ export function Office() {
 
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 
-function Cases() {
+export function Cases() {
   const { s, dispatch } = useGame();
   return (
     <div className="stack">
@@ -115,7 +115,7 @@ export function SkillBars({ m }: { m: Member }) {
   );
 }
 
-function Team() {
+export function Team() {
   const { s, dispatch } = useGame();
   const [train, setTrain] = useState<Record<string, SkillKey>>({});
   return (
@@ -174,7 +174,7 @@ function Team() {
   );
 }
 
-function Results() {
+export function Results() {
   const { s } = useGame();
   if (!s.results.length) return <p className="muted">まだ完了した案件はありません。</p>;
   return (

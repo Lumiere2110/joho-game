@@ -1,21 +1,18 @@
-// アプリ全体。状態を持ち、画面を切り替える
-import { useEffect, useMemo, useReducer, useState } from 'react';
+// アプリ全体。状態を持ち、上部の操作バーと画面の切り替え、時間の進行を受け持つ
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { caseById } from '../core/cases';
 import { reduce, type Action } from '../core/game';
 import { TERMS, TERM_CATEGORIES, termById } from '../core/glossary';
-import { deadlineWeek } from '../core/project';
+import { buildIssues } from '../core/issues';
+import { canRelease, deadlineWeek } from '../core/project';
 import { clearSave, loadGame, saveGame } from '../core/save';
-import { salaryTotal } from '../core/sim';
+import { computeStatus, type StatusItem } from '../core/status';
+import { fmtDate } from '../core/time';
 import type { GameState } from '../core/types';
-import { PHASE_NAMES, type Phase } from '../core/types';
-import { GameCtx, Meter, Modal, man, satTone, useGame } from './common';
-import { DesignView } from './Design';
-import { DevelopView } from './Develop';
-import { DoneView } from './Done';
-import { InvestigateView } from './Investigate';
-import { Office } from './Office';
-import { OperateView } from './Operate';
-import { RequirementsView } from './Requirements';
+import { PHASE_NAMES } from '../core/types';
+import { CommandCenter } from './CommandCenter';
+import { GameCtx, Modal, man, useGame, type Mode, type Screen, type Selection } from './common';
+import { AdminScreen, BusinessScreen, DevScreen, OpsScreen, SystemScreen } from './Screens';
 
 type Root = GameState | null;
 
@@ -25,15 +22,134 @@ function rootReduce(s: Root, a: Action): Root {
   return reduce(s, a);
 }
 
+const MODE_KEY = 'joho-game-mode';
+function loadMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'detail' ? 'detail' : 'easy';
+  } catch {
+    return 'easy';
+  }
+}
+
+const SCREENS: { id: Screen; label: string }[] = [
+  { id: 'main', label: '司令室' },
+  { id: 'system', label: 'システム' },
+  { id: 'business', label: '業務' },
+  { id: 'dev', label: '開発' },
+  { id: 'ops', label: '運用・セキュリティ' },
+  { id: 'admin', label: '管理' },
+];
+
+interface Toast {
+  key: number;
+  title: string;
+  items: { label: string; from: string; to: string; better: boolean | null }[];
+}
+
+/** 判断の前後で、状態がどう変わったかを並べる */
+function diffStatus(before: StatusItem[], after: StatusItem[], mode: Mode): Toast['items'] {
+  const out: Toast['items'] = [];
+  for (const a of after) {
+    const b = before.find((x) => x.id === a.id);
+    if (!b || b.display === a.display) continue;
+    let better: boolean | null = null;
+    if (a.value !== null && b.value !== null && a.value !== b.value) better = a.id === 'cost' ? a.value < b.value : a.value > b.value;
+    out.push({ label: a.label, from: mode === 'easy' && b.word !== a.word ? b.word : b.display, to: mode === 'easy' && b.word !== a.word ? a.word : a.display, better });
+  }
+  return out;
+}
+
 export function App() {
-  const [state, dispatch] = useReducer(rootReduce, null, () => loadGame());
+  const [state, rawDispatch] = useReducer(rootReduce, null, () => loadGame());
   const [term, setTerm] = useState<string | null>(null);
   const [glossary, setGlossary] = useState(false);
   const [help, setHelp] = useState(false);
+  const [mode, setModeRaw] = useState<Mode>(loadMode);
+  const [screen, setScreenRaw] = useState<Screen>('main');
+  const [sel, setSel] = useState<Selection>(null);
+  const [speed, setSpeed] = useState<0 | 1 | 2>(0);
+  const [frozen, setFrozen] = useState(false);
+  const [pauseNote, setPauseNote] = useState<{ text: string; issue?: string } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const lastAct = useRef('');
+  const prevState = useRef<Root>(state);
+  const prevStatus = useRef<StatusItem[] | null>(state ? computeStatus(state) : null);
+
+  const dispatch = useCallback((a: Action) => {
+    lastAct.current = a.type;
+    rawDispatch(a);
+  }, []);
+  const setMode = (m: Mode) => {
+    setModeRaw(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      /* 保存できなくても動く */
+    }
+  };
+  const setScreen = useCallback((x: Screen) => {
+    setScreenRaw(x);
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     if (state) saveGame(state);
   }, [state]);
+
+  const p = state?.project ?? null;
+  const canAuto = !!state && !!p && (p.phase === 'develop' || p.phase === 'operate') && !p.pendingEvent && !state.gameOver;
+
+  // 再生中は、一定の間隔で1週間ずつ進む
+  useEffect(() => {
+    if (!speed || !canAuto) return;
+    const t = setTimeout(() => dispatch({ type: 'nextWeek' }), speed === 1 ? 3000 : 1200);
+    return () => clearTimeout(t);
+  }, [state, speed, canAuto, dispatch]);
+
+  // 状態が変わったとき：自動一時停止の判定と、「何が変わったか」の表示
+  useEffect(() => {
+    const prev = prevState.current;
+    prevState.current = state;
+    if (!state) return;
+    const now = computeStatus(state);
+    const before = prevStatus.current;
+    prevStatus.current = now;
+    const a = lastAct.current;
+    lastAct.current = '';
+    if (before && a && !['learnTerm', 'load', 'newGame', 'startCase', 'finishCase', 'abandonCase'].includes(a)) {
+      const items = diffStatus(before, now, mode);
+      if (items.length) setToast({ key: Date.now(), title: a === 'nextWeek' ? `${fmtDate(state.week - 1)}の週の結果` : 'あなたの判断で変わったこと', items });
+    }
+    // 自動で一時停止する場面（失敗や攻撃を落ち着いて確認できるように）
+    const pp = prev?.project;
+    const cp = state.project;
+    let reason: { text: string; issue?: string } | null = null;
+    if (pp && (!cp || pp.phase !== cp.phase)) reason = { text: cp ? `「${PHASE_NAMES[cp.phase]}」の段階に進みました。` : '案件が終わりました。' };
+    else if (cp?.pendingEvent && !pp?.pendingEvent) reason = { text: '依頼主から相談が来ました。返事をするまで開発は進みません。', issue: 'req-change' };
+    else if (cp && pp && cp.phase === 'develop' && canRelease(cp) && !canRelease(pp)) reason = { text: '必須の作業が終わりました。リリースするか、テストを続けるか決めましょう。', issue: 'task-release' };
+    else if (cp?.ops && (pp?.ops?.history.length ?? 0) < cp.ops.history.length) {
+      const last = cp.ops.history[cp.ops.history.length - 1];
+      const inc = (last.incidents ?? []).find((x) => x.kind === 'failure' || x.kind === 'attack' || x.kind === 'overload');
+      if (inc) {
+        const iss = buildIssues(state).find((x) => x.id.startsWith(`inc-${last.week}-${inc.node}`));
+        reason = { text: `${inc.kind === 'attack' ? '攻撃を受けました' : inc.kind === 'overload' ? '処理が追いつかなくなりました' : '障害が起きました'}：${inc.title}`, issue: iss?.id };
+      }
+    }
+    if (reason && (speed > 0 || reason.issue)) {
+      if (speed > 0) {
+        setSpeed(0);
+        setFrozen(true);
+      }
+      setPauseNote(reason);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const ctx = useMemo(
     () =>
@@ -45,17 +161,88 @@ export function App() {
               setTerm(id);
               dispatch({ type: 'learnTerm', id });
             },
+            mode,
+            screen,
+            setScreen,
+            sel,
+            setSel,
+            frozen,
           }
         : null,
-    [state],
+    [state, dispatch, mode, screen, setScreen, sel, frozen],
   );
 
   if (!state || !ctx) return <Title onStart={(name) => dispatch({ type: 'newGame', seed: (Date.now() % 2147483647) | 0, companyName: name })} />;
 
+  const time = {
+    speed,
+    canAuto,
+    play: (v: 0 | 1 | 2) => {
+      setSpeed(v);
+      setFrozen(v === 0 && canAuto);
+      if (v > 0) setPauseNote(null);
+    },
+    step: () => dispatch({ type: 'nextWeek' }),
+  };
+
   return (
     <GameCtx.Provider value={ctx}>
-      <Header onGlossary={() => setGlossary(true)} onHelp={() => setHelp(true)} />
-      <main className="main">{state.project ? <ProjectView /> : <Office />}</main>
+      <TopBar time={time} setMode={setMode} onGlossary={() => setGlossary(true)} onHelp={() => setHelp(true)} />
+      <nav className="screens" aria-label="画面の切り替え">
+        {SCREENS.map((x) => (
+          <button key={x.id} className={`scr ${screen === x.id ? 'on' : ''}`} onClick={() => setScreen(x.id)} aria-current={screen === x.id ? 'page' : undefined}>
+            {x.label}
+            {x.id === 'main' && <BadCount />}
+          </button>
+        ))}
+      </nav>
+      {pauseNote && (
+        <div className="pausebar" role="status">
+          <span>⏸ {pauseNote.text}</span>
+          {pauseNote.issue && (
+            <button
+              className="btn small primary"
+              onClick={() => {
+                setScreen('main');
+                setSel({ kind: 'issue', id: pauseNote.issue! });
+                setPauseNote(null);
+              }}
+            >
+              詳しく見る
+            </button>
+          )}
+          <button className="btn ghost small" onClick={() => setPauseNote(null)} aria-label="閉じる">
+            ✕
+          </button>
+        </div>
+      )}
+      <main className={screen === 'main' ? 'main wide' : 'main'}>
+        {screen === 'main' && <CommandCenter />}
+        {screen === 'system' && <SystemScreen />}
+        {screen === 'business' && <BusinessScreen />}
+        {screen === 'dev' && <DevScreen />}
+        {screen === 'ops' && <OpsScreen />}
+        {screen === 'admin' && <AdminScreen />}
+      </main>
+      {toast && (
+        <div className="toast" key={toast.key} role="status">
+          <div className="spread">
+            <b>{toast.title}</b>
+            <button className="btn ghost small" onClick={() => setToast(null)} aria-label="閉じる">
+              ✕
+            </button>
+          </div>
+          <ul className="plain small">
+            {toast.items.map((x) => (
+              <li key={x.label}>
+                <span className="muted">{x.label}：</span>
+                {x.from} → <b>{x.to}</b>
+                {x.better !== null && <span className={`delta ${x.better ? 'up' : 'down'}`}>{x.better ? ' ▲ 良くなった' : ' ▼ 悪くなった'}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {state.gameOver && (
         <Modal>
           <h2>倒産…</h2>
@@ -81,18 +268,22 @@ export function App() {
   );
 }
 
+function BadCount() {
+  const { s } = useGame();
+  const n = useMemo(() => buildIssues(s).filter((i) => i.tone === 'bad' || i.tone === 'security').length, [s]);
+  return n ? <span className="cnt" aria-label={`急ぎ ${n}件`}>{n}</span> : null;
+}
+
 function Title({ onStart }: { onStart: (name: string) => void }) {
   const [name, setName] = useState('ルミエール情報システム');
   return (
     <div className="title-screen">
       <div className="card title-card stack">
         <div className="row">
-          <div className="logo-mark" style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--accent)', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700 }}>
-            情
-          </div>
+          <div className="logo-mark big">情</div>
           <div>
             <h1>情報ゲーム</h1>
-            <div className="muted">情報システムを企画し、つくり、守り、改善するストラテジー</div>
+            <div className="muted">情報システムの司令室 — 企画し、つくり、守り、改善するストラテジー</div>
           </div>
         </div>
         <p>
@@ -110,161 +301,90 @@ function Title({ onStart }: { onStart: (name: string) => void }) {
   );
 }
 
-function Header({ onGlossary, onHelp }: { onGlossary: () => void; onHelp: () => void }) {
-  const { s } = useGame();
+interface TimeCtl {
+  speed: 0 | 1 | 2;
+  canAuto: boolean;
+  play: (v: 0 | 1 | 2) => void;
+  step: () => void;
+}
+
+function TopBar({ time, setMode, onGlossary, onHelp }: { time: TimeCtl; setMode: (m: Mode) => void; onGlossary: () => void; onHelp: () => void }) {
+  const { s, mode } = useGame();
+  const p = s.project;
+  const c = p ? caseById(p.caseId) : null;
+  let remain = '—';
+  if (p && c) {
+    if (p.phase === 'operate' && p.ops) remain = `運用 ${p.ops.week}/${c.opsWeeks}週`;
+    else if (p.phase === 'done') remain = '運用終了';
+    else {
+      const left = deadlineWeek(c, p) - s.week;
+      remain = left >= 0 ? `納期まで あと${left}週` : `納期を${-left}週超過`;
+    }
+  }
+  const canStep = !p || ((p.phase === 'develop' || p.phase === 'operate') && !p.pendingEvent);
   return (
-    <header className="header">
-      <div className="logo">
+    <header className="topbar">
+      <div className="tb-brand">
         <span className="logo-mark">情</span>
-        {s.companyName}
+        <div>
+          <div className="tb-company">{s.companyName}</div>
+          <div className="tiny muted">{p && c ? `${c.client}｜${PHASE_NAMES[p.phase]}` : '案件なし（依頼を選びましょう）'}</div>
+        </div>
       </div>
-      <div className="stats">
+      <div className="tb-stats">
         <div className="stat">
-          <span className="k">週</span>
-          <span className="v">{s.week}週目</span>
+          <span className="k">日付</span>
+          <span className="v">
+            {fmtDate(s.week)}
+            <span className="muted small">（第{s.week}週）</span>
+          </span>
         </div>
         <div className="stat">
           <span className="k">資金</span>
           <span className={`v ${s.money < 0 ? 'neg' : ''}`}>{man(s.money)}</span>
         </div>
+        {p && (
+          <div className="stat">
+            <span className="k">予算の残り</span>
+            <span className={`v ${p.budget - p.spent < 0 ? 'neg' : ''}`}>{man(p.budget - p.spent)}</span>
+          </div>
+        )}
         <div className="stat">
-          <span className="k">人件費</span>
-          <span className="v">{man(salaryTotal(s))}/週</span>
+          <span className="k">残りの期間</span>
+          <span className="v">{remain}</span>
         </div>
-        <div className="stat">
-          <span className="k">評判</span>
-          <span className="v">{s.reputation}</span>
+      </div>
+      <div className="tb-time" role="group" aria-label="時間の進み方">
+        <button className={`tbtn ${time.speed === 0 ? 'on' : ''}`} onClick={() => time.play(0)} disabled={!time.canAuto} title="一時停止" aria-label="一時停止">
+          ⏸
+        </button>
+        <button className={`tbtn ${time.speed === 1 ? 'on' : ''}`} onClick={() => time.play(1)} disabled={!time.canAuto} title="再生（3秒で1週間）" aria-label="再生">
+          ▶
+        </button>
+        <button className={`tbtn ${time.speed === 2 ? 'on' : ''}`} onClick={() => time.play(2)} disabled={!time.canAuto} title="早送り" aria-label="早送り">
+          ⏩
+        </button>
+        <button className="btn small" onClick={time.step} disabled={!canStep || time.speed > 0} title={canStep ? '' : '調査・要件定義・設計は、作業を選ぶと時間が進みます'}>
+          {p ? '1週進める' : '1週待つ'}
+        </button>
+      </div>
+      <div className="tb-tools">
+        <div className="seg" role="group" aria-label="表示の細かさ">
+          <button className={mode === 'easy' ? 'on' : ''} onClick={() => setMode('easy')}>
+            かんたん
+          </button>
+          <button className={mode === 'detail' ? 'on' : ''} onClick={() => setMode('detail')}>
+            詳細
+          </button>
         </div>
-        <button className="btn" onClick={onGlossary}>
+        <button className="btn small" onClick={onGlossary}>
           用語集 {s.knownTerms.length}/{TERMS.length}
         </button>
-        <button className="btn ghost" onClick={onHelp}>
+        <button className="btn ghost small" onClick={onHelp}>
           遊び方
         </button>
       </div>
     </header>
-  );
-}
-
-const PHASES: Phase[] = ['investigate', 'requirements', 'design', 'develop', 'operate', 'done'];
-
-function ProjectView() {
-  const { s } = useGame();
-  const p = s.project!;
-  const idx = PHASES.indexOf(p.phase);
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [p.phase]);
-  return (
-    <>
-      <div className="stepper">
-        {PHASES.map((ph, i) => (
-          <div key={ph} className={`step ${i < idx ? 'done' : i === idx ? 'now' : ''}`}>
-            {i + 1}. {PHASE_NAMES[ph]}
-          </div>
-        ))}
-      </div>
-      <div className="grid2">
-        <div>
-          {p.phase === 'investigate' && <InvestigateView />}
-          {p.phase === 'requirements' && <RequirementsView />}
-          {p.phase === 'design' && <DesignView />}
-          {p.phase === 'develop' && <DevelopView />}
-          {p.phase === 'operate' && <OperateView />}
-          {p.phase === 'done' && <DoneView />}
-        </div>
-        <SidePanel />
-      </div>
-    </>
-  );
-}
-
-function SidePanel() {
-  const { s, dispatch } = useGame();
-  const p = s.project!;
-  const c = caseById(p.caseId);
-  const dl = deadlineWeek(c, p);
-  const left = dl - s.week;
-  const [confirm, setConfirm] = useState(false);
-  return (
-    <aside className="stack">
-      <div className="card stack">
-        <div>
-          <div className="tiny muted">{c.industry}</div>
-          <h3 style={{ margin: 0 }}>{c.client}</h3>
-          <div className="small">{c.title}</div>
-        </div>
-        <table className="small">
-          <tbody>
-            <tr>
-              <th>受注額（予算）</th>
-              <td className="right num">{man(p.budget)}</td>
-            </tr>
-            <tr>
-              <th>契約</th>
-              <td className="right">{p.contract === 'ukeoi' ? '請負' : p.contract === 'junin' ? '準委任' : '未定'}</td>
-            </tr>
-            <tr>
-              <th>納期</th>
-              <td className="right num">
-                {dl}週目{p.phase !== 'operate' && p.phase !== 'done' && <span className={left < 0 ? 'badge bad' : left <= 2 ? 'badge warn' : 'badge'} style={{ marginLeft: 6 }}>{left >= 0 ? `あと${left}週` : `${-left}週遅れ`}</span>}
-              </td>
-            </tr>
-            <tr>
-              <th>この案件の支出</th>
-              <td className="right num">{man(p.spent)}</td>
-            </tr>
-            <tr>
-              <th>この案件の収入</th>
-              <td className="right num">{man(p.received)}</td>
-            </tr>
-            <tr>
-              <th>収支</th>
-              <td className={`right num ${p.received - p.spent < 0 ? 'muted' : ''}`}>{man(p.received - p.spent)}</td>
-            </tr>
-          </tbody>
-        </table>
-        {(p.phase === 'operate' || p.phase === 'done') && (
-          <div>
-            <div className="spread small">
-              <span>依頼主の満足度</span>
-              <b className="num">{Math.round(p.satisfaction)}</b>
-            </div>
-            <Meter value={p.satisfaction} tone={satTone(p.satisfaction)} />
-          </div>
-        )}
-        {p.phase !== 'done' && (
-          <button className="btn danger ghost small" onClick={() => setConfirm(true)}>
-            案件をやめる…
-          </button>
-        )}
-      </div>
-      <div className="card">
-        <h3>できごと</h3>
-        <ul className="log">
-          {s.log.slice(0, 60).map((l, i) => (
-            <li key={i}>
-              <span className="w">{l.week}週</span>
-              <span className={l.kind}>{l.text}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      {confirm && (
-        <Modal onClose={() => setConfirm(false)}>
-          <h3>案件を途中でやめますか？</h3>
-          <p>依頼主に迷惑がかかるので、評判が 5 下がります。これまでの費用は戻りません。</p>
-          <div className="row">
-            <button className="btn danger" onClick={() => (setConfirm(false), dispatch({ type: 'abandonCase' }))}>
-              やめる
-            </button>
-            <button className="btn" onClick={() => setConfirm(false)}>
-              続ける
-            </button>
-          </div>
-        </Modal>
-      )}
-    </aside>
   );
 }
 
@@ -340,6 +460,12 @@ function HelpModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} wide>
       <h2>遊び方</h2>
       <div className="stack">
+        <p>
+          <b>司令室</b>が基本の画面です。左に「対応が必要なこと」、中央にシステムの構成図、右に詳しい説明と対応の候補、下に満足度・安定性・処理速度・安全性・進み具合・運用コストが出ます。左の項目を選ぶと構成図の関係する機器が光り、機器を選ぶと性能や費用、壊れたときの影響が見られます。上の ▶ で時間が進み、障害や攻撃が起きると自動で一時停止します。
+        </p>
+        <p>
+          上のタブで「システム（構成）」「業務（仕事の流れ）」「開発（調査〜リリース）」「運用・セキュリティ」「管理（お金・契約・チーム）」に切り替えられます。「かんたん／詳細」で表示の細かさを変えられます。
+        </p>
         <p>依頼を受けたら、6つのフェーズで情報システムを作り、運用します。</p>
         <ol className="stack" style={{ paddingLeft: 20 }}>
           <li>

@@ -67,7 +67,7 @@ export function DesignView() {
 // ------------------------------------------------------------
 // データベース
 // ------------------------------------------------------------
-function DataTab() {
+export function DataTab() {
   const { s, dispatch } = useGame();
   const p = s.project!;
   const c = caseById(p.caseId);
@@ -166,7 +166,7 @@ function DataTab() {
 // ------------------------------------------------------------
 // 処理方式
 // ------------------------------------------------------------
-function ProcessTab() {
+export function ProcessTab() {
   const { s, dispatch } = useGame();
   const p = s.project!;
   const c = caseById(p.caseId);
@@ -418,7 +418,7 @@ export function InfraMetrics({ c, p, infra }: { c: CaseDef; p: Project; infra: I
   );
 }
 
-function InfraTab() {
+export function InfraTab() {
   const { s, dispatch } = useGame();
   const p = s.project!;
   const c = caseById(p.caseId);
@@ -521,7 +521,7 @@ export function ThreatTable({ c, measures }: { c: CaseDef; measures: string[] })
   );
 }
 
-function SecurityTab() {
+export function SecurityTab() {
   const { s, dispatch } = useGame();
   const p = s.project!;
   const c = caseById(p.caseId);
@@ -618,7 +618,7 @@ export function BackupEditor({ b, dataGB, onChange }: { b: Backup; dataGB: numbe
   );
 }
 
-function BackupTab() {
+export function BackupTab() {
   const { s, dispatch } = useGame();
   const p = s.project!;
   const c = caseById(p.caseId);
@@ -635,7 +635,7 @@ function BackupTab() {
 // ------------------------------------------------------------
 // レビュー
 // ------------------------------------------------------------
-function ReviewTab() {
+export function ReviewTab() {
   const { s, dispatch } = useGame();
   const p = s.project!;
   const c = caseById(p.caseId);
