@@ -519,3 +519,40 @@ textarea.code { width: 100%; box-sizing: border-box; font-family: ui-monospace, 
   .guide { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 50vh; }
   .guide-pill { right: auto; }
 }
+
+/* ---- 動きを見る（トレース） ---- */
+.trace { border-color: var(--accent); }
+.tr-bars { display: flex; align-items: flex-end; gap: 4px; height: 150px; padding: 18px 4px 0; background: var(--surface-2); border-radius: 8px; }
+.tr-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; }
+.tr-bar { width: 100%; background: var(--data); border-radius: 4px 4px 0 0; transition: height 0.25s; }
+.tr-v { font-size: 11px; color: var(--text-2); padding: 2px 0; }
+.tr-col.hi .tr-bar { background: var(--warn); }
+.tr-col.found .tr-bar { background: var(--good); }
+.tr-col.out .tr-bar { background: var(--off); opacity: 0.35; }
+.tr-col.out .tr-v { opacity: 0.45; }
+.tr-mark { position: absolute; top: -16px; font-size: 11px; color: var(--warn); }
+.tr-col.found .tr-mark { color: var(--good); }
+.tr-key.hi { color: var(--warn); }
+.tr-key.found { color: var(--good); }
+.tr-key.out { color: var(--off); }
+.tr-note { min-height: 2.6em; }
+.tr-ctrl input[type='range'] { flex: 1; min-width: 100px; }
+.tr-ctrl select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 5px; font-size: 12px; padding: 3px 4px; }
+.blk.banned { border-color: var(--bad); }
+
+/* ---- 勉強会（アルゴリズム道場） ---- */
+.study { display: grid; grid-template-columns: 260px 1fr; gap: 14px; align-items: start; }
+.drill-list { display: flex; flex-direction: column; gap: 6px; }
+.drill-item { text-align: left; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; font-size: 13px; }
+.drill-item:hover { background: var(--surface-2); }
+.drill-item.on { border-color: var(--accent); background: var(--accent-soft); }
+.drill-item .ok { color: var(--good); font-weight: 700; }
+.drill-item .lv { color: var(--muted); font-size: 11px; }
+.checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.checks li.ok { color: var(--good); }
+.checks li.ng { color: var(--bad); }
+@media (max-width: 760px) {
+  .study { grid-template-columns: 1fr; }
+  .tr-bars { height: 120px; gap: 2px; }
+  .tr-v { font-size: 9px; }
+}

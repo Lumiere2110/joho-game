@@ -10,7 +10,8 @@ import { COMPLEXITY_TEXT, blockDef, runProgram, type Block } from './program';
 import { buildTasks, canRelease, deadlineWeek, initialSatisfaction, isSolved, newProject, taskDone } from './project';
 import { Rng } from './rng';
 import { devWeek, log, opsWeek, passWeek } from './sim';
-import { initialStaff, makeCandidate } from './staff';
+import { drillById, judgeDrill } from './drills';
+import { gainExp, initialStaff, makeCandidate } from './staff';
 import type { Backup, Contract, GameState, Infra, Member, SkillKey, Task } from './types';
 
 export type Action =
@@ -44,7 +45,8 @@ export type Action =
   | { type: 'finishCase' }
   | { type: 'hire'; id: string }
   | { type: 'fire'; id: string }
-  | { type: 'train'; id: string; skill: SkillKey };
+  | { type: 'train'; id: string; skill: SkillKey }
+  | { type: 'solveDrill'; id: string; blocks: Block[] };
 
 export const TRAIN_COST = 30;
 
@@ -64,6 +66,7 @@ export function newGame(seed: number, companyName = 'ルミエール情報シス
     log: [],
     gameOver: false,
     nextId: 100,
+    drills: [],
   };
   refreshCandidates(s, new Rng(seed));
   log(s, `${companyName} が設立されました。最初の依頼を選びましょう。`, 'good');
@@ -122,6 +125,17 @@ function apply(s: GameState, a: Action, rng: Rng) {
       if (p) delete p.assignments[a.id];
       s.money -= m.salary * 2;
       log(s, `${m.name} が退職しました（退職金 ${m.salary * 2}万円）。`, 'info');
+      return;
+    }
+    case 'solveDrill': {
+      // 社内勉強会（アルゴリズム道場）：プログラムをもう一度動かして確かめ、初めて合格したら全員に経験値
+      // 時間（週）は進まない。案件中でも空き時間にできる
+      const d = drillById(a.id);
+      if (!d || (s.drills ?? []).includes(d.id) || !judgeDrill(d, a.blocks).pass) return;
+      s.drills = [...(s.drills ?? []), d.id];
+      learn(s, d.terms);
+      const ups = s.staff.filter((m) => gainExp(m, 'dev', d.reward)).map((m) => m.name);
+      log(s, `勉強会で「${d.title}」を解きました。全員の開発の経験 +${d.reward}${ups.length ? `（${ups.join('・')} の開発スキルが上がった！）` : ''}`, 'good');
       return;
     }
     case 'train': {

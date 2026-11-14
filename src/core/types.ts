@@ -57,7 +57,7 @@ export interface ProcessDef {
   callsPerRequest?: number; // online のとき、1リクエストあたり何回呼ばれるか（平均）
   options: ProcessOption[];
   /** ブロックでプログラムを作るときの目的（find=探す update=探して更新 next=次の順番 order=並べ替え） */
-  program?: { goal: Goal; keys?: SortKey[]; target: string };
+  program?: { goal: Goal; keys?: SortKey[]; target: string; presorted?: boolean /* テストのデータが最初から番号順に並んでいる */ };
 }
 
 /** ブロックで作ったプログラム（設計に保存する） */
@@ -379,6 +379,7 @@ export interface GameState {
   log: LogEntry[];
   gameOver: boolean;
   nextId: number;
+  drills?: string[]; // 解いた練習問題（アルゴリズム道場）のID。古いセーブには無いので省略可
 }
 
 /** 構成図に表示する障害・攻撃の記録 */

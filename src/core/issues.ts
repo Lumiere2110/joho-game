@@ -12,7 +12,7 @@ import { weeklyRisk } from './status';
 import { fmtDate } from './time';
 import type { CaseDef, GameState, Infra, Project, SolveCond, ThreatId, Tier } from './types';
 
-export type Screen = 'main' | 'system' | 'business' | 'dev' | 'ops' | 'admin';
+export type Screen = 'main' | 'system' | 'business' | 'dev' | 'ops' | 'admin' | 'study';
 
 export interface IssueAction {
   label: string;

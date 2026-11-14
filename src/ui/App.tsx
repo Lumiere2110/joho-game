@@ -1,4 +1,5 @@
 // アプリ全体。状態を持ち、上部の操作バーと画面の切り替え、時間の進行を受け持つ
+import { StudyScreen } from './Study';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { caseById } from '../core/cases';
 import { reduce, type Action } from '../core/game';
@@ -39,6 +40,7 @@ const SCREENS: { id: Screen; label: string }[] = [
   { id: 'dev', label: '開発' },
   { id: 'ops', label: '運用・セキュリティ' },
   { id: 'admin', label: '管理' },
+  { id: 'study', label: '🧩 勉強会' },
 ];
 
 interface Toast {
@@ -240,6 +242,7 @@ export function App() {
         {screen === 'dev' && <DevScreen />}
         {screen === 'ops' && <OpsScreen />}
         {screen === 'admin' && <AdminScreen />}
+        {screen === 'study' && <StudyScreen />}
       </main>
       {toast && (
         <div className="toast" key={toast.key} role="status">
@@ -513,7 +516,7 @@ function HelpModal({ onClose, onTour, guideOn, onGuide }: { onClose: () => void;
           <b>司令室</b>が基本の画面です。左に「対応が必要なこと」、中央にシステムの構成図、右に詳しい説明と対応の候補、下に満足度・安定性・処理速度・安全性・進み具合・運用コストが出ます。左の項目を選ぶと構成図の関係する機器が光り、機器を選ぶと性能や費用、壊れたときの影響が見られます。上の ▶ で時間が進み、障害や攻撃が起きると自動で一時停止します。
         </p>
         <p>
-          上のタブで「システム（構成）」「業務（仕事の流れ）」「開発（調査〜リリース）」「運用・セキュリティ」「管理（お金・契約・チーム）」に切り替えられます。「かんたん／詳細」で表示の細かさを変えられます。
+          上のタブで「システム（構成）」「業務（仕事の流れ）」「開発（調査〜リリース）」「運用・セキュリティ」「管理（お金・契約・チーム）」「勉強会（アルゴリズムの練習問題）」に切り替えられます。勉強会でプログラムの問題を解くと、チームの開発スキルが育ちます。プログラムは「1手ずつ動きを見る」で動きを確かめられます。「かんたん／詳細」で表示の細かさを変えられます。
         </p>
         <p>依頼を受けたら、6つのフェーズで情報システムを作り、運用します。</p>
         <ol className="stack" style={{ paddingLeft: 20 }}>

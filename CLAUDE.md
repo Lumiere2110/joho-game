@@ -16,6 +16,8 @@
   - `staff.ts` メンバー、採用候補、作業量
   - `guide.ts` チュートリアルの「次にやること」（段階ごとの手順と完了判定）。フェーズや作業を足したら、ここの手順も足す
   - `program.ts` ブロックのプログラム（ブロックの種類 `BLOCKS`、実行・操作回数の計測 `runProgram`、計算量の判定、コード⇔ブロック変換）。案件の処理に `program`（目的・テストの種類）と各方式に `recipe`（使うブロック）を書くと、プレイヤーのプログラムがその方式に対応づけられる。どれとも違えば `custom`（`calc.ts` の `chosenOption`）
+  - `drills.ts` アルゴリズム道場（勉強会の練習問題）。`DRILLS` に問題（目的・合格条件 `limit`・ヒント・解説）を足す。判定は `runProgram` に条件を足した `judgeDrill`。`drills.test.ts` に模範解答を足す
+  - `program.ts` の `traceProgram` … 12件のデータで1手ずつの様子（並び・見ている場所・範囲・答え）を記録する。新しいブロックを足したら `tr()` で何をしたかを記録する
   - 司令室の表示用データ（純粋関数・`view.test.ts` でテスト）
     - `issues.ts` 左の「対応が必要なこと」（何が・影響・期限・放置したら・関係する機器・対応候補 Action）。新しい問題・イベントはここに項目を足す
     - `topology.ts` 構成図のノード・エッジ・状態（ok/busy/down/attack/off）と `NODE_ROLE` の説明
@@ -29,7 +31,8 @@
   - `Diagram.tsx`・`Icons.tsx` 構成図とアイコン（形で役割、色＋記号＋文字で状態）
   - `Screens.tsx` システム／業務／開発／運用・セキュリティ／管理 画面。フェーズ別の部品（Investigate・Design・Develop・Operate など）を組み合わせる
   - `Tutorial.tsx` 画面の案内（`TOUR` の各手順は CSS セレクタで場所を指す。画面の部品のクラス名を変えたら合わせる）と「次にやること」パネル
-  - `Program.tsx` ブロックでプログラムを作る画面（設計の処理タブ。詳細表示ではコードでも書ける）
+  - `Program.tsx` ブロックでプログラムを作る部品 `Workbench`（設計の処理タブと勉強会で共通。詳細表示ではコードでも書ける）と、動きを1手ずつ見る `TraceView`
+  - `Study.tsx` 勉強会（アルゴリズム道場）画面
   - `common.tsx` 用語リンク `<T id>`・`TermNote`（用語＋短い説明）・グラフ・画面の共通状態（mode/screen/sel）
 - 色の意味：青=データ・通信、緑=正常、黄=高負荷・要確認、赤=障害・緊急、紫=セキュリティ、灰=停止。色だけに頼らず記号か文字を必ず添える。
 - `tools/balance.test.ts` … バランス確認（`npx vitest run tools --silent=false`）

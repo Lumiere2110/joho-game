@@ -125,3 +125,22 @@ describe('運用中の改善', () => {
     expect(g.get().project!.design.measures).toContain('waf');
   });
 });
+
+describe('勉強会（アルゴリズム道場）', () => {
+  it('初めて解くと全員に開発の経験値。2回目・不合格では何も起きない', () => {
+    let s = newGame(1);
+    const week = s.week;
+    const before = s.staff.map((m) => m.exp.dev + m.skills.dev * 100);
+    const good = [{ kind: 'each' as const, body: [{ kind: 'ifKey' as const, body: [{ kind: 'keep' as const }] }] }];
+    s = reduce(s, { type: 'solveDrill', id: 'd-linear', blocks: [{ kind: 'keep' }] });
+    expect(s.drills).toEqual([]);
+    s = reduce(s, { type: 'solveDrill', id: 'd-linear', blocks: good });
+    expect(s.drills).toEqual(['d-linear']);
+    expect(s.week).toBe(week);
+    expect(s.knownTerms).toContain('linear-search');
+    const after = s.staff.map((m) => m.exp.dev + m.skills.dev * 100);
+    after.forEach((v, i) => expect(v).toBeGreaterThan(before[i]));
+    const again = reduce(s, { type: 'solveDrill', id: 'd-linear', blocks: good });
+    expect(again.staff).toEqual(s.staff);
+  });
+});
